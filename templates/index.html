@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CampaignIQ · Marketing Campaign Responder</title>
+  <meta name="theme-color" content="#08080a">
+  <link rel="icon" href="{{ url_for('static', filename='logo.svg') }}" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+{# ---------- reusable number field with  −  +  buttons ---------- #}
+{% macro num(name, label, value, min=0, max=100000, step=1, hint='', prefix='') %}
+<div class="field">
+  <label for="{{ name }}">{{ label }}</label>
+  <div class="stepper">
+    <button type="button" class="st" data-dir="-1" tabindex="-1" aria-label="Decrease {{ label }}">−</button>
+    {% if prefix %}<span class="pre">{{ prefix }}</span>{% endif %}
+    <input id="{{ name }}" type="number" name="{{ name }}" value="{{ value }}" min="{{ min }}" max="{{ max }}" data-step="{{ step }}" inputmode="numeric">
+    <button type="button" class="st" data-dir="1" tabindex="-1" aria-label="Increase {{ label }}">+</button>
+  </div>
+  {% if hint %}<small>{{ hint }}</small>{% endif %}
+</div>
+{% endmacro %}
+
+<div class="bg" aria-hidden="true"><i class="orb o1"></i><i class="orb o2"></i><i class="grid-bg"></i></div>
+
+<div class="app">
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="side">
+    <div class="brand">
+      <img src="{{ url_for('static', filename='logo.svg') }}" alt="CampaignIQ logo" class="logo">
+      <div><b>Campaign<span>IQ</span></b><small>Marketing Campaign Responder</small></div>
+    </div>
+
+    <div class="pitch">
+      <h1>Know who will say <em>yes</em> before you hit send.</h1>
+      <p>Answer a few simple questions about a customer. We'll tell you how likely they are to respond to your next campaign.</p>
+    </div>
+
+    <ol class="nav-steps" id="navSteps">
+      {% set steps = [('Customer','Who they are'),('Spending','What they buy'),('Habits','How they shop'),('History','Past campaigns')] %}
+      {% for t, s in steps %}
+      <li data-step="{{ loop.index }}"><span class="dot"><b>{{ loop.index }}</b>
+        <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+        <div><strong>{{ t }}</strong><small>{{ s }}</small></div></li>
+      {% endfor %}
+    </ol>
+
+    <div class="model-card">
+      <span class="pulse"></span>
+      <div><small>Model quality (AUC)</small><b>{{ '%.2f' % metrics.get('roc_auc', 0) }}</b></div>
+      <p>Score out of 1.00. Higher means better at spotting responders.</p>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <main class="main">
+    <div class="card" id="card">
+      <!-- ---------- FORM ---------- -->
+      <form id="form" novalidate>
+        <div class="progress"><span id="bar"></span></div>
+
+        <div class="quick">
+          <span>New here? Load an example:</span>
+          <button type="button" class="chip" data-preset="high">🔥 Likely customer</button>
+          <button type="button" class="chip" data-preset="low">❄️ Unlikely customer</button>
+        </div>
+
+        <!-- STEP 1 -->
+        <section class="step" data-step="1">
+          <header><small>Step 1 of 4</small><h2>Tell us about the customer</h2><p>Basic details about the person.</p></header>
+          <div class="grid">
+            {{ num('Age', 'Age', 45, 18, 110, 1, 'In years') }}
+            {{ num('Income', 'Yearly income', 55000, 1, 1000000, 1000, 'Before tax', '$') }}
+            <div class="field">
+              <label for="Education">Education</label>
+              <select id="Education" name="Education" class="control">
+                {% set edu = {'Basic':'Basic','2n Cycle':'2nd Cycle','Graduation':'Graduation (Bachelor\'s)','Master':'Master\'s','PhD':'PhD'} %}
+                {% for e in education %}<option value="{{ e }}" {{ 'selected' if e == 'Graduation' }}>{{ edu[e] }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="field">
+              <label for="Marital_Status">Relationship status</label>
+              <select id="Marital_Status" name="Marital_Status" class="control">
+                {% for m in marital %}<option value="{{ m }}" {{ 'selected' if m == 'Married' }}>{{ m }}</option>{% endfor %}
+              </select>
+            </div>
+            {{ num('Kidhome', 'Young kids at home', 0, 0, 5, 1, 'Children') }}
+            {{ num('Teenhome', 'Teenagers at home', 0, 0, 5, 1, 'Aged 13–19') }}
+            <div class="field full">
+              <label for="Customer_Since">Became a customer on</label>
+              <input id="Customer_Since" type="date" name="Customer_Since" class="control" max="{{ ref_date }}" value="2013-06-15" required>
+              <small>Roughly is fine. This tells us how loyal they are.</small>
+            </div>
+          </div>
+        </section>
+
+        <!-- STEP 2 -->
+        <section class="step" data-step="2">
+          <header><small>Step 2 of 4</small><h2>What did they spend?</h2><p>Total money spent per category over the last 2 years.</p></header>
+          <div class="grid g3">
+            {{ num('MntWines', '🍷 Wine', 200, 0, 100000, 10, '', '$') }}
+            {{ num('MntMeatProducts', '🥩 Meat', 100, 0, 100000, 10, '', '$') }}
+            {{ num('MntFishProducts', '🐟 Fish', 20, 0, 100000, 10, '', '$') }}
+            {{ num('MntFruits', '🍎 Fruit', 20, 0, 100000, 10, '', '$') }}
+            {{ num('MntSweetProducts', '🍬 Sweets', 15, 0, 100000, 10, '', '$') }}
+            {{ num('MntGoldProds', '🪙 Gold items', 30, 0, 100000, 10, '', '$') }}
+          </div>
+          <div class="total">Total spent <b id="spendTotal">$385</b></div>
+        </section>
+
+        <!-- STEP 3 -->
+        <section class="step" data-step="3">
+          <header><small>Step 3 of 4</small><h2>How do they shop?</h2><p>Number of purchases made, by where they bought.</p></header>
+          <div class="grid g3">
+            {{ num('NumStorePurchases', '🏬 In store', 5, 0, 500) }}
+            {{ num('NumWebPurchases', '💻 On website', 4, 0, 500) }}
+            {{ num('NumCatalogPurchases', '📖 By catalog', 2, 0, 500) }}
+            {{ num('NumDealsPurchases', '🏷️ Using a discount', 2, 0, 500) }}
+            {{ num('NumWebVisitsMonth', '🌐 Site visits / month', 5, 0, 500) }}
+            {{ num('Recency', '⏱️ Days since last buy', 30, 0, 365, 1, 'Lower = more recent') }}
+          </div>
+          <label class="switch"><input type="checkbox" name="Complain"><i></i><span>They filed a complaint in the last 2 years</span></label>
+        </section>
+
+        <!-- STEP 4 -->
+        <section class="step" data-step="4">
+          <header><small>Step 4 of 4</small><h2>Did they accept earlier offers?</h2><p>Tap every past campaign this customer said <b>yes</b> to. Leave blank if none.</p></header>
+          <div class="cmps">
+            {% for n in range(1, 6) %}
+            <label class="cmp"><input type="checkbox" name="AcceptedCmp{{ n }}">
+              <span><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><b>Campaign {{ n }}</b><small>Tap if accepted</small></span></label>
+            {% endfor %}
+          </div>
+        </section>
+
+        <p class="error" id="error" role="alert" hidden></p>
+
+        <div class="actions">
+          <button type="button" class="btn ghost" id="backBtn">← Back</button>
+          <button type="submit" class="btn primary" id="nextBtn"><span>Continue →</span></button>
+        </div>
+      </form>
+
+      <!-- ---------- RESULT ---------- -->
+      <section id="result" class="result" hidden>
+        <div class="res-top">
+          <div class="ring">
+            <svg viewBox="0 0 180 180" aria-hidden="true">
+              <circle class="r-track" cx="90" cy="90" r="74"/>
+              <circle class="r-fill" id="rFill" cx="90" cy="90" r="74" transform="rotate(-90 90 90)"/>
+              <line id="rTick" class="r-tick"/>
+            </svg>
+            <div class="r-center"><b id="pct">0%</b><span>chance to respond</span></div>
+          </div>
+          <div class="res-text">
+            <span class="tag" id="tag"></span>
+            <h2 id="headline"></h2>
+            <p id="sub"></p>
+          </div>
+        </div>
+
+        <div class="cols">
+          <div class="box"><h4><i class="up">▲</i> Working in their favour</h4><ul id="pros" class="reasons"></ul></div>
+          <div class="box"><h4><i class="down">▼</i> Working against them</h4><ul id="cons" class="reasons"></ul></div>
+        </div>
+
+        <div class="box"><h4>Customer at a glance</h4><dl id="derived" class="glance"></dl></div>
+        <p class="legend"><span class="tick-key"></span> The white mark on the ring is the <b>contact line</b> (<span id="thr">5%</span>). Above it, the customer is worth contacting.</p>
+
+        <div class="actions">
+          <button type="button" class="btn ghost" id="editBtn">← Edit details</button>
+          <button type="button" class="btn primary" id="againBtn"><span>Check another customer</span></button>
+        </div>
+      </section>
+    </div>
+    <p class="foot">Predictions are estimates to support your marketing decisions, not replace your judgement.</p>
+  </main>
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
